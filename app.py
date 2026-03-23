@@ -310,5 +310,6 @@ if __name__ == '__main__':
     print("Loading models (this may take a few minutes)...")
     load_models()
     print("Models loaded! Starting server...")
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    app.run(debug=False, host='0.0.0.0', port=port)
 
