@@ -11,10 +11,10 @@ A sophisticated AI-powered web application that translates video content across 
 
 - 🎥 **Video Upload & Processing** - Support for multiple video formats (MP4, AVI, MOV, MKV, WAV)
 - 🌐 **Multilingual Translation** - Translate videos to and from numerous languages
-- 🧠 **AI-Powered Intelligence** - Advanced RAG and LLM technology for context-aware translations
+- 🧠 **AI-Powered Intelligence** - Summarize and analyze video transcripts with Google Gemini
 - 📝 **Automatic Subtitle Generation** - Generate and embed translated subtitles directly into videos
 - ⚡ **Fast Processing** - Efficient algorithms for rapid video translation
-- 🔍 **Content Analysis** - RAG-based relevance checking for accurate translations
+- 💬 **Content Generation** - Instantly get summaries of the videos using Generative AI
 - 💾 **Easy Download** - Get your translated videos with embedded subtitles
 
 ---
@@ -38,7 +38,7 @@ A sophisticated AI-powered web application that translates video content across 
 | **Backend Framework** | Flask (Python) |
 | **Speech Recognition** | OpenAI Whisper |
 | **Translation Model** | Facebook NLLB-200 |
-| **RAG System** | FAISS + Sentence Transformers |
+| **Content Summary** | Google Gemini API (gemini-2.5-flash) |
 | **Video Processing** | FFmpeg |
 | **Frontend** | HTML5, CSS3, JavaScript, Bootstrap 5 |
 | **ML Libraries** | PyTorch, Transformers, HuggingFace |
@@ -65,7 +65,7 @@ A sophisticated AI-powered web application that translates video content across 
        │
        ▼
 ┌─────────────┐
-│    RAG      │  Context analysis & relevance check
+│   Gemini API│  Context analysis & summarization
 └──────┬──────┘
        │
        ▼
@@ -80,7 +80,7 @@ A sophisticated AI-powered web application that translates video content across 
        │
        ▼
 ┌─────────────┐
-│   User      │  Downloads translated video
+│   User      │  Downloads translated video & reads summary
 └─────────────┘
 ```
 
@@ -139,7 +139,6 @@ On the first run, the application will automatically download required ML models
 
 - **Whisper Base Model** (~150MB)
 - **NLLB-200 Translation Model** (~1.2GB)
-- **Sentence Transformers** (~90MB)
 
 **Note:** This initial download may take 10-15 minutes depending on your internet speed. Models are cached locally for subsequent runs.
 
@@ -200,11 +199,11 @@ curl -X POST -F "file=@video.mp4" \
 1. **Audio Extraction**: Video file is processed to extract audio track
 2. **Speech Recognition**: Whisper transcribes audio to text in the original language
 3. **Language Detection**: Automatic detection of source language (if not specified)
-4. **RAG Analysis**: Content is analyzed against news corpus for context and relevance
+4. **Summary Generation**: Transcript is sent to Google Gemini to get a concise summary
 5. **Translation**: NLLB-200 translates the transcribed text to target language
 6. **Subtitle Generation**: SRT file is created with translated subtitles and timestamps
 7. **Video Processing**: FFmpeg embeds subtitles into the original video
-8. **Delivery**: User receives the translated video with embedded subtitles
+8. **Delivery**: User receives the translated video with embedded subtitles and a textual summary
 
 ---
 
@@ -221,11 +220,7 @@ CrossLingualAI/
 ├── README.md            # Project documentation
 │
 ├── uploads/             # Temporary upload directory
-├── outputs/             # Processed video output directory
-│
-├── news_corpus_*.json   # News corpus data for RAG
-├── faiss_index.index    # FAISS vector index (generated)
-└── docs.json            # Document cache (generated)
+└── outputs/             # Processed video output directory
 ```
 
 ---

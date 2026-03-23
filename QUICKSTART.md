@@ -76,7 +76,6 @@ Once the server starts (after models finish loading), open your browser:
 - **Model Download:** 10-15 minutes (first run only)
   - Whisper model (~150MB)
   - NLLB-200 model (~1.2GB)
-  - Sentence Transformers (~90MB)
 - **Subsequent Runs:** 1-2 minutes (models cached)
 
 ---

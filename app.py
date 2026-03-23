@@ -3,20 +3,21 @@ import tempfile
 import subprocess
 import whisper
 import json
-import faiss
 import numpy as np
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from werkzeug.utils import secure_filename
 import time
+import google.generativeai as genai
+
+import google.generativeai as genai
+
+genai.configure(api_key="AIzaSyBH0LK3xqcnK2HoHa4XoD6yZLg5lPunljg")
 
 app = Flask(__name__)
 CORS(app)
 
-# Configuration
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'wav'}
@@ -25,7 +26,6 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Language mappings
 WHISPER_TO_NLLB = {
     "en": "eng_Latn",
     "es": "spa_Latn",
@@ -41,20 +41,16 @@ WHISPER_TO_NLLB = {
     "ru": "rus_Cyrl"
 }
 
-# Global models (loaded on startup)
 whisper_model = None
 translation_tokenizer = None
 translation_model = None
-rag_model = None
-faiss_index = None
-rag_documents = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def load_models():
     """Load all ML models on startup"""
-    global whisper_model, translation_tokenizer, translation_model, rag_model, faiss_index, rag_documents
+    global whisper_model, translation_tokenizer, translation_model, summarization_model
     
     print("Loading Whisper model...")
     whisper_model = whisper.load_model("base")
@@ -63,76 +59,6 @@ def load_models():
     model_name = "facebook/nllb-200-distilled-600M"
     translation_tokenizer = AutoTokenizer.from_pretrained(model_name)
     translation_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    
-    print("Loading RAG model...")
-    rag_model = SentenceTransformer("all-MiniLM-L6-v2")
-    
-    print("Loading FAISS index...")
-    load_or_create_faiss_index()
-
-def load_or_create_faiss_index():
-    """Load or create FAISS index from news corpus"""
-    global faiss_index, rag_documents
-    
-    index_path = "faiss_index.index"
-    docs_path = "docs.json"
-    
-    # Find news corpus JSON file
-    news_files = [f for f in os.listdir('.') if f.startswith('news_corpus') and f.endswith('.json')]
-    
-    if not news_files:
-        print("Warning: No news corpus JSON files found. RAG will not work.")
-        faiss_index = None
-        rag_documents = []
-        return
-    
-    news_file = news_files[0]  # Use the first one found
-    
-    if os.path.exists(index_path) and os.path.exists(docs_path):
-        print("Loading existing FAISS index...")
-        faiss_index = faiss.read_index(index_path)
-        with open(docs_path, "r", encoding="utf-8") as f:
-            rag_documents = json.load(f)
-        print(f"Loaded {len(rag_documents)} documents from index")
-    else:
-        print("Creating new FAISS index...")
-        documents = []
-        
-        # Load news articles
-        with open(news_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                articles = data
-            else:
-                articles = data.get("articles", [])
-            
-            for article in articles:
-                content = article.get("content") or article.get("description") or article.get("title", "")
-                if content:
-                    documents.append(content)
-        
-        if not documents:
-            print("Warning: No valid content found in news corpus.")
-            faiss_index = None
-            rag_documents = []
-            return
-        
-        # Generate embeddings
-        print(f"Generating embeddings for {len(documents)} documents...")
-        doc_embeddings = rag_model.encode(documents, convert_to_numpy=True, show_progress_bar=True)
-        
-        # Build FAISS index
-        dimension = doc_embeddings.shape[1]
-        faiss_index = faiss.IndexFlatL2(dimension)
-        faiss_index.add(doc_embeddings.astype('float32'))
-        
-        # Save index and documents
-        faiss.write_index(faiss_index, index_path)
-        with open(docs_path, "w", encoding="utf-8") as f:
-            json.dump(documents, f)
-        
-        rag_documents = documents
-        print(f"Created FAISS index with {len(documents)} documents")
 
 def extract_audio_from_video(video_path):
     """Extract audio from video file"""
@@ -203,24 +129,6 @@ def translate_text(text, source_lang_code, target_lang_code="en"):
             translated_parts.append(sentence)  # Fallback to original
     
     return ". ".join(translated_parts)
-
-def check_relevance(text, threshold=0.2):
-    """Check if text is relevant to news corpus using RAG"""
-    if faiss_index is None or not rag_documents:
-        return True, None, 1.0  # If no RAG index, assume relevant
-    
-    query_embedding = rag_model.encode([text], convert_to_numpy=True)
-    D, I = faiss_index.search(query_embedding.astype('float32'), k=1)
-    
-    matched_doc = rag_documents[I[0][0]]
-    matched_embedding = rag_model.encode([matched_doc], convert_to_numpy=True)
-    score = cosine_similarity(query_embedding, matched_embedding)[0][0]
-    
-    # Convert numpy float32 to Python float for JSON serialization
-    score = float(score)
-    
-    # Return relevance status, matched doc, and score
-    return score >= threshold, matched_doc, score
 
 def generate_srt_from_segments(segments, filename):
     """Generate SRT file from Whisper segments"""
@@ -312,42 +220,38 @@ def upload_video():
         if not allowed_file(file.filename):
             return jsonify({'error': 'Invalid file type'}), 400
         
-        # Save uploaded file
         filename = secure_filename(file.filename)
         video_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(video_path)
         
-        # Check file size
         file_size = os.path.getsize(video_path)
         if file_size > MAX_FILE_SIZE:
             os.remove(video_path)
             return jsonify({'error': 'File too large (max 500MB)'}), 400
         
-        # Step 1: Extract audio
         print("Extracting audio...")
         audio_path = extract_audio_from_video(video_path)
         
-        # Step 2: Transcribe
         print("Transcribing...")
         native_text, detected_lang, segments = transcribe_audio(audio_path)
         
-        # Use detected language if auto was selected
         if source_lang == 'auto':
             source_lang = detected_lang
         
-        # Step 3: Translate
         print("Translating...")
         translated_text = translate_text(native_text, source_lang, target_lang)
         
-        # Step 4: RAG relevance check (informational only - don't block processing)
-        print("Checking relevance...")
-        relevant, matched_doc, relevance_score = check_relevance(translated_text)
+        print("Summarizing video content using Gemini API...")
+        summary = "Summary could not be generated."
+        if translated_text.strip():
+            try:
+                gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+                prompt = f"Please provide a simple, layman's summary of the following video transcript. Keep it concise but cover the main points:\n\n{translated_text}"
+                response = gemini_model.generate_content(prompt)
+                summary = response.text.replace('*', '')  # Remove markdown asterisks for the JS alert
+            except Exception as e:
+                print(f"Summarization error: {e}")
         
-        if not relevant:
-            print(f"Warning: Low relevance score ({relevance_score:.3f}), but proceeding anyway...")
-            # Don't block - just log a warning. Users should be able to translate any video.
-        
-        # Step 5: Generate SRT with translated text
         print("Generating subtitles...")
         srt_filename = os.path.join(OUTPUT_FOLDER, f"{filename}_subtitles.srt")
         if segments and source_lang != target_lang:
@@ -369,13 +273,11 @@ def upload_video():
             duration = 60  # Default, could extract from video metadata
             generate_srt_from_text(translated_text, srt_filename, duration)
         
-        # Step 6: Embed subtitles
         print("Embedding subtitles...")
         output_filename = f"{filename.rsplit('.', 1)[0]}_translated.mp4"
         output_path = os.path.join(OUTPUT_FOLDER, output_filename)
         embed_subtitles(video_path, srt_filename, output_path)
         
-        # Cleanup
         os.remove(audio_path)
         os.remove(video_path)
         
@@ -385,7 +287,7 @@ def upload_video():
             'transcription': native_text,
             'translation': translated_text,
             'detected_language': detected_lang,
-            'relevance_score': round(float(relevance_score), 3),
+            'summary': summary,
             'download_url': f'/api/download/{output_filename}'
         })
         

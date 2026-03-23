@@ -760,6 +760,32 @@ footer .input-group .btn {
                 </div>
             </div>
         </div>
+        
+        <!-- Results Section (Initially Hidden) -->
+        <div class="upload-container" id="resultsSection" style="display: none; margin-top: 30px;">
+            <h3 class="mb-4 text-center" style="color: #f5f5f5; font-weight: 600;">Translation Complete!</h3>
+            <div class="row">
+                <div class="col-lg-10 mx-auto">
+                    <div class="card bg-dark border-secondary mb-4" style="background-color: #0a0a0a !important;">
+                        <div class="card-header border-secondary text-white fw-bold py-3" style="font-size: 1.1rem;">
+                            <i class="fas fa-language me-2" style="color: var(--primary);"></i> Detected Language: <span id="resDetectedLang" style="color: #f5f5f5;">English</span>
+                        </div>
+                        <div class="card-body text-white p-4">
+                            <h5 class="card-title fw-bold mb-3" style="color: var(--primary);"><i class="fas fa-file-alt me-2"></i>Video Summary</h5>
+                            <p class="card-text" id="resSummary" style="color: #e0e0e0; font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;"></p>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="#" id="resDownloadBtn" class="btn btn-primary btn-lg px-4">
+                            <i class="fas fa-download me-2"></i> Download Video
+                        </a>
+                        <button type="button" class="btn btn-outline-light btn-lg px-4" id="translateAnotherBtn" style="border-radius: 50px;">
+                            <i class="fas fa-redo me-2"></i> Translate Another
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- Features Section - Before Upload -->
@@ -858,6 +884,21 @@ footer .input-group .btn {
             const translateBtn = document.getElementById('translateBtn');
             const uploadForm = document.getElementById('uploadForm');
             const processingSection = document.getElementById('processingSection');
+            
+            const resultsSection = document.getElementById('resultsSection');
+            const resDetectedLang = document.getElementById('resDetectedLang');
+            const resSummary = document.getElementById('resSummary');
+            const resDownloadBtn = document.getElementById('resDownloadBtn');
+            const translateAnotherBtn = document.getElementById('translateAnotherBtn');
+            
+            // Translate Another button click
+            translateAnotherBtn.addEventListener('click', function() {
+                resultsSection.style.display = 'none';
+                uploadForm.closest('.upload-container').style.display = 'block';
+                fileInput.value = '';
+                filePreview.style.display = 'none';
+                translateBtn.disabled = true;
+            });
             
             // Browse button click
             browseBtn.addEventListener('click', function() {
@@ -970,7 +1011,7 @@ footer .input-group .btn {
                     { step: 'Uploading video...', progress: 10 },
                     { step: 'Extracting audio...', progress: 20 },
                     { step: 'Transcribing audio...', progress: 40 },
-                    { step: 'Analyzing content with RAG...', progress: 60 },
+                    { step: 'Summarizing video content...', progress: 60 },
                     { step: 'Translating content...', progress: 75 },
                     { step: 'Generating subtitles...', progress: 85 },
                     { step: 'Embedding subtitles into video...', progress: 95 },
@@ -1020,22 +1061,17 @@ footer .input-group .btn {
                         throw new Error(result.error || 'Processing failed');
                     }
                     
-                    // Show success message
+                    // Show success message and results
                     setTimeout(() => {
-                        alert(`Translation complete!\n\nDetected Language: ${result.detected_language}\n\nYour translated video is ready for download.`);
-                        
-                        // Create download link
-                        const downloadLink = document.createElement('a');
-                        downloadLink.href = result.download_url;
-                        downloadLink.download = result.output_file;
-                        downloadLink.click();
-                        
-                        // Reset UI
                         processingSection.style.display = 'none';
-                        uploadForm.closest('.upload-container').style.display = 'block';
-                        fileInput.value = '';
-                        filePreview.style.display = 'none';
-                        translateBtn.disabled = true;
+                        resultsSection.style.display = 'block';
+                        
+                        resDetectedLang.textContent = result.detected_language;
+                        resSummary.textContent = result.summary;
+                        
+                        resDownloadBtn.href = result.download_url;
+                        resDownloadBtn.download = result.output_file;
+                        resDownloadBtn.click(); // Auto-download
                     }, 1000);
                     
                 } catch (error) {
