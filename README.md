@@ -324,19 +324,10 @@ This project is open-source and available under the MIT License.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - OpenAI for Whisper speech recognition model
 - Facebook AI for NLLB-200 translation model
 - HuggingFace for Transformers and Sentence Transformers
 - Flask community for the excellent web framework
 
----
-
-## 📧 Contact
-
-For questions, suggestions, or support, please open an issue on GitHub.
-
----
-
-**Made with ❤️ using AI and Machine Learning**
