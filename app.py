@@ -12,8 +12,16 @@ import time
 import google.generativeai as genai
 
 import google.generativeai as genai
+from dotenv import load_dotenv
 
-genai.configure(api_key="AIzaSyBH0LK3xqcnK2HoHa4XoD6yZLg5lPunljg")
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure the API key from the environment
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    print("WARNING: GEMINI_API_KEY not found in environment variables!")
+genai.configure(api_key=api_key)
 
 app = Flask(__name__)
 CORS(app)
@@ -166,15 +174,13 @@ def format_timestamp(seconds):
     return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
 
 def embed_subtitles(video_path, srt_path, output_path):
-    """Embed subtitles into video using ffmpeg"""
-    # Escape the SRT path for ffmpeg
-    srt_path_escaped = srt_path.replace('\\', '\\\\').replace(':', '\\:')
-    
+    """Embed subtitles into video using ffmpeg without re-encoding"""
     cmd = [
-        'ffmpeg', '-i', video_path,
-        '-vf', f"subtitles={srt_path_escaped}",
-        '-c:a', 'copy',
-        '-y',  # Overwrite output
+        'ffmpeg', '-y',
+        '-i', video_path,
+        '-i', srt_path,
+        '-c', 'copy',
+        '-c:s', 'mov_text',
         output_path
     ]
     result = subprocess.run(
@@ -194,6 +200,28 @@ def embed_subtitles(video_path, srt_path, output_path):
 def index():
     """Serve the main HTML page"""
     return send_file('index.html')
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Chatbot endpoint for video summaries"""
+    try:
+        data = request.json
+        context = data.get('context', '')
+        question = data.get('question', '')
+        
+        if not context or not question:
+            return jsonify({'error': 'Context and question are required'}), 400
+            
+        gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+        prompt = f"Context from a video:\n{context}\n\nQuestion: {question}\n\nAnswer based on the context above:"
+        
+        response = gemini_model.generate_content(prompt)
+        return jsonify({'answer': response.text})
+    except Exception as e:
+        print(f"Chat error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health():

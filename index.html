@@ -775,6 +775,22 @@ footer .input-group .btn {
                             <p class="card-text" id="resSummary" style="color: #e0e0e0; font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;"></p>
                         </div>
                     </div>
+                    
+                    <!-- Interactive Chatbot Section -->
+                    <div class="card bg-dark border-secondary mb-4" style="background-color: #0a0a0a !important;">
+                        <div class="card-header border-secondary text-white fw-bold py-3" style="font-size: 1.1rem;">
+                            <i class="fas fa-robot me-2" style="color: var(--primary);"></i> Ask questions about the video
+                        </div>
+                        <div class="card-body text-white p-4">
+                            <div id="chatHistory" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px; padding: 15px; border: 1px solid #333; border-radius: 10px; background-color: #1a1a1a;">
+                                <div class="mb-2"><strong>AI:</strong> What would you like to know about this video?</div>
+                            </div>
+                            <div class="input-group">
+                                <input type="text" id="chatInput" class="form-control bg-dark text-white border-secondary" placeholder="Ask a question..." autocomplete="off">
+                                <button class="btn btn-primary" type="button" id="chatSendBtn"><i class="fas fa-paper-plane"></i> Send</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="d-flex justify-content-center gap-3">
                         <a href="#" id="resDownloadBtn" class="btn btn-primary btn-lg px-4">
                             <i class="fas fa-download me-2"></i> Download Video
@@ -890,6 +906,60 @@ footer .input-group .btn {
             const resSummary = document.getElementById('resSummary');
             const resDownloadBtn = document.getElementById('resDownloadBtn');
             const translateAnotherBtn = document.getElementById('translateAnotherBtn');
+            
+            // New variables for chat
+            const chatHistory = document.getElementById('chatHistory');
+            const chatInput = document.getElementById('chatInput');
+            const chatSendBtn = document.getElementById('chatSendBtn');
+            let currentVideoContext = "";
+            
+            // Chatbot functionality
+            chatSendBtn.addEventListener('click', async function() {
+                const question = chatInput.value.trim();
+                if (!question) return;
+                
+                // Add user question to history
+                chatHistory.innerHTML += `<div class="mb-2 text-end"><span style="background-color: var(--primary); padding: 8px 12px; border-radius: 15px; display: inline-block;">${question}</span></div>`;
+                chatInput.value = '';
+                
+                // Add loading indicator
+                const loadingId = 'loading-' + Date.now();
+                chatHistory.innerHTML += `<div id="${loadingId}" class="mb-2 text-muted"><strong>AI is typing...</strong></div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            context: currentVideoContext,
+                            question: question
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    document.getElementById(loadingId).remove();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Chat failed');
+                    }
+                    
+                    chatHistory.innerHTML += `<div class="mb-3"><strong>AI:</strong> <div style="background-color: #333; padding: 10px 15px; border-radius: 15px; display: inline-block; margin-top: 5px;">${result.answer.replace(/\\n/g, '<br>')}</div></div>`;
+                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                    
+                } catch (error) {
+                    document.getElementById(loadingId).remove();
+                    chatHistory.innerHTML += `<div class="mb-2 text-danger"><strong>Error:</strong> ${error.message}</div>`;
+                }
+            });
+            
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    chatSendBtn.click();
+                }
+            });
             
             // Translate Another button click
             translateAnotherBtn.addEventListener('click', function() {
@@ -1068,6 +1138,13 @@ footer .input-group .btn {
                         
                         resDetectedLang.textContent = result.detected_language;
                         resSummary.textContent = result.summary;
+                        
+                        // Save context for chatbot
+                        currentVideoContext = result.translation || result.transcription || result.summary;
+                        
+                        // Reset chat history
+                        chatHistory.innerHTML = '<div class="mb-2"><strong>AI:</strong> What would you like to know about this video?</div>';
+                        
                         
                         resDownloadBtn.href = result.download_url;
                         resDownloadBtn.download = result.output_file;
