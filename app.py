@@ -49,6 +49,25 @@ WHISPER_TO_NLLB = {
     "ru": "rus_Cyrl"
 }
 
+# edge-tts voice mapping per language
+EDGE_TTS_VOICES = {
+    "en": "en-US-JennyNeural",
+    "es": "es-ES-ElviraNeural",
+    "fr": "fr-FR-DeniseNeural",
+    "de": "de-DE-KatjaNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "hi": "hi-IN-SwaraNeural",
+    "ta": "ta-IN-PallaviNeural",
+    "te": "te-IN-ShrutiNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "ko": "ko-KR-SunHiNeural",
+    "ar": "ar-EG-SalmaNeural",
+    "ru": "ru-RU-SvetlanaNeural",
+    "pt": "pt-BR-FranciscaNeural",
+    "it": "it-IT-ElsaNeural",
+    "nl": "nl-NL-ColetteNeural",
+}
+
 whisper_model = None
 translation_tokenizer = None
 translation_model = None
@@ -58,7 +77,7 @@ def allowed_file(filename):
 
 def load_models():
     """Load all ML models on startup"""
-    global whisper_model, translation_tokenizer, translation_model, summarization_model
+    global whisper_model, translation_tokenizer, translation_model
     
     print("Loading Whisper model...")
     whisper_model = whisper.load_model("base")
@@ -196,6 +215,178 @@ def embed_subtitles(video_path, srt_path, output_path):
     
     return output_path
 
+# ──────────────────────────────────────────────
+#  VIDEO DUBBING HELPERS
+# ──────────────────────────────────────────────
+
+def download_youtube_video(url):
+    """Download a YouTube video using yt-dlp and return local path"""
+    import yt_dlp
+    output_template = os.path.join(UPLOAD_FOLDER, '%(id)s.%(ext)s')
+    ydl_opts = {
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'outtmpl': output_template,
+        'merge_output_format': 'mp4',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        video_id = info.get('id', 'video')
+        file_path = os.path.join(UPLOAD_FOLDER, f"{video_id}.mp4")
+        # yt-dlp may produce a differently-named file; find it
+        if not os.path.exists(file_path):
+            for fname in os.listdir(UPLOAD_FOLDER):
+                if video_id in fname:
+                    file_path = os.path.join(UPLOAD_FOLDER, fname)
+                    break
+    return file_path
+
+async def _generate_tts_async(text, voice, output_path):
+    """Internal async edge-tts call"""
+    import edge_tts
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(output_path)
+
+def generate_tts_for_text(text, target_lang, output_path):
+    """Generate TTS audio for given text using edge-tts"""
+    import asyncio
+    voice = EDGE_TTS_VOICES.get(target_lang, "en-US-JennyNeural")
+    if not text.strip():
+        _generate_silence_wav(output_path, 0.5)
+        return output_path
+    try:
+        asyncio.run(_generate_tts_async(text, voice, output_path))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_generate_tts_async(text, voice, output_path))
+        loop.close()
+    return output_path
+
+def _generate_silence_wav(path, duration_sec):
+    """Create a short silent WAV file"""
+    cmd = [
+        'ffmpeg', '-f', 'lavfi', '-i', f'anullsrc=r=24000:cl=mono',
+        '-t', str(duration_sec), '-y', path
+    ]
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def get_audio_duration(path):
+    """Return duration of audio file in seconds using ffprobe"""
+    cmd = [
+        'ffprobe', '-v', 'error', '-show_entries',
+        'format=duration', '-of', 'json', path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        info = json.loads(result.stdout)
+        return float(info['format']['duration'])
+    except Exception:
+        return 1.0
+
+def speed_adjust_audio(input_path, output_path, target_duration):
+    """Speed-adjust TTS audio to fit within target_duration using ffmpeg atempo"""
+    actual_duration = get_audio_duration(input_path)
+    if actual_duration <= 0 or target_duration <= 0:
+        import shutil
+        shutil.copy(input_path, output_path)
+        return output_path
+    
+    ratio = actual_duration / target_duration
+    # atempo supports 0.5–2.0; clamp to valid range
+    ratio = max(0.5, min(2.0, ratio))
+    
+    cmd = [
+        'ffmpeg', '-i', input_path,
+        '-filter:a', f'atempo={ratio:.4f}',
+        '-y', output_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        import shutil
+        shutil.copy(input_path, output_path)
+    return output_path
+
+def build_dubbed_audio(translated_segments, target_lang, video_duration):
+    """
+    For each segment, generate TTS, speed-match to segment duration,
+    then overlay onto a silent timeline matching video duration.
+    """
+    from pydub import AudioSegment
+
+    timeline = AudioSegment.silent(duration=int(video_duration * 1000))  # ms
+
+    for i, seg in enumerate(translated_segments):
+        text = seg['text'].strip()
+        start_ms = int(seg['start'] * 1000)
+        end_ms = int(seg['end'] * 1000)
+        seg_duration = (end_ms - start_ms) / 1000.0
+
+        if not text:
+            continue
+
+        tts_raw_path = tempfile.mktemp(suffix=f'_tts_{i}.mp3')
+        tts_adj_path = tempfile.mktemp(suffix=f'_tts_adj_{i}.wav')
+
+        try:
+            generate_tts_for_text(text, target_lang, tts_raw_path)
+            speed_adjust_audio(tts_raw_path, tts_adj_path, seg_duration)
+            seg_audio = AudioSegment.from_file(tts_adj_path)
+            # Trim if TTS is slightly longer
+            if len(seg_audio) > int(seg_duration * 1000) + 200:
+                seg_audio = seg_audio[:int(seg_duration * 1000)]
+            timeline = timeline.overlay(seg_audio, position=start_ms)
+        except Exception as e:
+            print(f"TTS error for segment {i}: {e}")
+        finally:
+            for p in [tts_raw_path, tts_adj_path]:
+                try:
+                    if os.path.exists(p):
+                        os.remove(p)
+                except Exception:
+                    pass
+
+    final_audio_path = tempfile.mktemp(suffix='_dubbed.wav')
+    timeline.export(final_audio_path, format='wav')
+    return final_audio_path
+
+def replace_video_audio(video_path, new_audio_path, output_path):
+    """Replace video's audio track with new_audio_path, keeping original audio at low volume using ffmpeg."""
+    cmd = [
+        'ffmpeg', '-y',
+        '-i', video_path,
+        '-i', new_audio_path,
+        '-filter_complex', '[0:a]volume=0.15[a0];[1:a]volume=1.0[a1];[a0][a1]amix=inputs=2:duration=first[a]',
+        '-map', '0:v:0',      # video from first input
+        '-map', '[a]',        # mixed audio
+        '-c:v', 'copy',       # keep original video stream
+        '-c:a', 'aac',        # encode new audio as AAC
+        output_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        print(f"FFmpeg replace audio error: {result.stderr}")
+        raise Exception(f"FFmpeg failed: {result.stderr}")
+    return output_path
+
+def get_video_duration(video_path):
+    """Get video duration in seconds using ffprobe"""
+    cmd = [
+        'ffprobe', '-v', 'error', '-show_entries',
+        'format=duration', '-of', 'json', video_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        info = json.loads(result.stdout)
+        return float(info['format']['duration'])
+    except Exception:
+        return 60.0
+
+# ──────────────────────────────────────────────
+#  ROUTES
+# ──────────────────────────────────────────────
+
 @app.route('/')
 def index():
     """Serve the main HTML page"""
@@ -233,7 +424,7 @@ def health():
 
 @app.route('/api/upload', methods=['POST'])
 def upload_video():
-    """Handle video upload and processing"""
+    """Handle video upload and processing (subtitle embedding)"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -276,14 +467,13 @@ def upload_video():
                 gemini_model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = f"Please provide a simple, layman's summary of the following video transcript. Keep it concise but cover the main points:\n\n{translated_text}"
                 response = gemini_model.generate_content(prompt)
-                summary = response.text.replace('*', '')  # Remove markdown asterisks for the JS alert
+                summary = response.text.replace('*', '')
             except Exception as e:
                 print(f"Summarization error: {e}")
         
         print("Generating subtitles...")
         srt_filename = os.path.join(OUTPUT_FOLDER, f"{filename}_subtitles.srt")
         if segments and source_lang != target_lang:
-            # Translate segments individually to preserve timestamps
             translated_segments = []
             for segment in segments:
                 translated_seg_text = translate_text(segment["text"], source_lang, target_lang)
@@ -294,11 +484,9 @@ def upload_video():
                 })
             generate_srt_from_segments(translated_segments, srt_filename)
         elif segments:
-            # No translation needed, use original segments
             generate_srt_from_segments(segments, srt_filename)
         else:
-            # Fallback: estimate duration from video
-            duration = 60  # Default, could extract from video metadata
+            duration = 60
             generate_srt_from_text(translated_text, srt_filename, duration)
         
         print("Embedding subtitles...")
@@ -324,6 +512,115 @@ def upload_video():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/translate-audio-video', methods=['POST'])
+def translate_audio_video():
+    """
+    VIDEO DUBBING endpoint:
+    - Accepts file upload OR YouTube URL
+    - Transcribes audio (Whisper) — auto-detects source language
+    - Translates per-segment (NLLB)
+    - Generates neural TTS audio (edge-tts) per segment, speed-matched
+    - Replaces original audio with TTS track (FFmpeg)
+    - Returns dubbed MP4 for download
+    """
+    video_path = None
+    audio_path = None
+    dubbed_audio_path = None
+    cleanup_video = False
+
+    try:
+        target_lang = request.form.get('targetLanguage', 'en')
+        youtube_url = request.form.get('youtubeUrl', '').strip()
+
+        # ── Input: YouTube URL or file upload ──
+        if youtube_url:
+            print(f"Downloading YouTube video: {youtube_url}")
+            video_path = download_youtube_video(youtube_url)
+            cleanup_video = True
+        elif 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            if not allowed_file(file.filename):
+                return jsonify({'error': 'Invalid file type'}), 400
+            filename = secure_filename(file.filename)
+            video_path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(video_path)
+            cleanup_video = True
+            if os.path.getsize(video_path) > MAX_FILE_SIZE:
+                os.remove(video_path)
+                return jsonify({'error': 'File too large (max 500MB)'}), 400
+        else:
+            return jsonify({'error': 'Provide a video file or YouTube URL'}), 400
+
+        # ── Step 1: Extract audio ──
+        print("Extracting audio...")
+        audio_path = extract_audio_from_video(video_path)
+
+        # ── Step 2: Transcribe ──
+        print("Transcribing with Whisper (auto-detect language)...")
+        native_text, detected_lang, segments = transcribe_audio(audio_path)
+        print(f"Detected language: {detected_lang}")
+
+        # ── Step 3: Translate each segment ──
+        print(f"Translating {detected_lang} → {target_lang}...")
+        if detected_lang == target_lang:
+            translated_segments = [{'start': s['start'], 'end': s['end'], 'text': s['text']} for s in segments]
+            translated_text = native_text
+        else:
+            translated_segments = []
+            for seg in segments:
+                t = translate_text(seg['text'], detected_lang, target_lang)
+                translated_segments.append({
+                    'start': seg['start'],
+                    'end': seg['end'],
+                    'text': t
+                })
+            translated_text = ' '.join(s['text'] for s in translated_segments)
+
+        # ── Step 4: Get video duration ──
+        video_duration = get_video_duration(video_path)
+
+        # ── Step 5: Build dubbed audio track ──
+        print("Generating neural TTS dubbed audio track...")
+        dubbed_audio_path = build_dubbed_audio(translated_segments, target_lang, video_duration)
+
+        # ── Step 6: Replace audio in video ──
+        print("Muxing new audio into video...")
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+        output_filename = f"{base_name}_dubbed_{target_lang}.mp4"
+        output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+        replace_video_audio(video_path, dubbed_audio_path, output_path)
+
+        return jsonify({
+            'success': True,
+            'output_file': output_filename,
+            'transcription': native_text,
+            'translation': translated_text,
+            'detected_language': detected_lang,
+            'download_url': f'/api/download/{output_filename}'
+        })
+
+    except Exception as e:
+        print(f"Dubbing error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        for p in [audio_path, dubbed_audio_path]:
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+        if cleanup_video and video_path and os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except Exception:
+                pass
+
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):

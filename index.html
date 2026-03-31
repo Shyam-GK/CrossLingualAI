@@ -610,6 +610,103 @@ footer .input-group .btn {
     background: var(--primary);
     border: 2px solid var(--primary);
 }
+
+/* ── Translate Video Tab Styles ── */
+.input-toggle {
+    display: flex;
+    background: #0a0a0a;
+    border: 2px solid #333;
+    border-radius: 50px;
+    padding: 5px;
+    margin-bottom: 30px;
+    width: fit-content;
+}
+
+.input-toggle-btn {
+    padding: 10px 28px;
+    border-radius: 50px;
+    border: none;
+    background: transparent;
+    color: #999;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-toggle-btn.active {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+}
+
+.yt-input-group {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.yt-input-group.visible {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.yt-url-field {
+    background: #0a0a0a;
+    border: 2px solid #333;
+    border-radius: 15px;
+    padding: 16px 20px;
+    color: #f5f5f5;
+    font-size: 1rem;
+    width: 100%;
+    transition: var(--transition);
+}
+
+.yt-url-field:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
+    outline: none;
+}
+
+.yt-url-field::placeholder { color: #555; }
+
+.result-text-box {
+    background: #0f0f0f;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 18px;
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    line-height: 1.7;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.result-text-box::-webkit-scrollbar { width: 6px; }
+.result-text-box::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 3px; }
+.result-text-box::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+
+.step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(220,38,38,0.15);
+    border: 1px solid rgba(220,38,38,0.4);
+    border-radius: 30px;
+    padding: 6px 16px;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+}
+
     </style>
 </head>
 <body>
@@ -627,6 +724,11 @@ footer .input-group .btn {
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#converter">Converter</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="translateVideoNavBtn" href="#translate-video" onclick="showTranslateVideoSection()" style="color: var(--accent); font-weight:700;">
+                            <i class="fas fa-volume-up me-1"></i> Translate Video
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#about">About</a>
@@ -804,6 +906,165 @@ footer .input-group .btn {
         </div>
     </section>
 
+    <!-- ══════════════════════════════════════════ -->
+    <!-- TRANSLATE VIDEO (AUDIO DUBBING) SECTION  -->
+    <!-- ══════════════════════════════════════════ -->
+    <section id="translate-video" class="container" style="display:none; margin-bottom:50px;">
+        <!-- FORM CARD -->
+        <div class="upload-container" id="dubFormCard">
+            <h2 class="mb-1">Translate Video <span style="color:var(--primary)">Audio</span></h2>
+            <p style="color:#999; margin-bottom:30px;">Auto-detects the source language — replaces spoken audio with AI-generated voice in your chosen language.</p>
+
+            <!-- Input method toggle -->
+            <div class="input-toggle">
+                <button type="button" class="input-toggle-btn active" id="dubFileTabBtn" onclick="switchDubInput('file')">
+                    <i class="fas fa-file-video"></i> Upload File
+                </button>
+                <button type="button" class="input-toggle-btn" id="dubYtTabBtn" onclick="switchDubInput('youtube')">
+                    <i class="fab fa-youtube" style="color:#ff4040;"></i> YouTube URL
+                </button>
+            </div>
+
+            <form id="dubForm">
+                <!-- File upload area -->
+                <div id="dubFileGroup">
+                    <input type="file" id="dubFileInput" class="d-none" accept="video/*">
+                    <div class="drop-area" id="dubDropArea">
+                        <div class="text-center">
+                            <i class="fas fa-file-video upload-icon mb-3"></i>
+                            <h4 style="color:#f5f5f5; font-weight:600;">Drop Video or Click to Browse</h4>
+                            <p class="mb-3" style="color:#999;">Upload a video to dub its audio into another language</p>
+                            <button type="button" class="btn btn-primary px-5" id="dubBrowseBtn">
+                                <i class="fas fa-folder-open me-2"></i>Choose File
+                            </button>
+                            <p class="mt-4 mb-0" style="color:#666; font-size:0.9rem;">Accepted: MP4, AVI, MOV, MKV &nbsp;|&nbsp; Max 500 MB</p>
+                        </div>
+                    </div>
+                    <!-- file preview -->
+                    <div class="file-preview" id="dubFilePreview">
+                        <div class="file-info">
+                            <i class="fas fa-file-video file-icon"></i>
+                            <div>
+                                <h5 id="dubFileName" style="color:#f5f5f5;">video.mp4</h5>
+                                <p class="mb-0" id="dubFileSize" style="color:#999;">0 MB</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger ms-auto" id="dubRemoveFile"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- YouTube URL input -->
+                <div class="yt-input-group" id="dubYtGroup">
+                    <div style="position:relative;">
+                        <i class="fab fa-youtube" style="position:absolute; left:18px; top:50%; transform:translateY(-50%); font-size:1.4rem; color:#ff4040;"></i>
+                        <input type="url" class="yt-url-field" id="dubYtUrl" placeholder="Paste YouTube video URL here..." style="padding-left:52px;">
+                    </div>
+                    <p class="mt-2" style="color:#666; font-size:0.85rem;"><i class="fas fa-info-circle me-1"></i>Paste a full YouTube video URL. Download may take time depending on video size.</p>
+                </div>
+
+                <!-- Target language -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="language-select">
+                            <label class="form-label d-flex align-items-center">
+                                <i class="fas fa-globe me-2" style="color:var(--primary);"></i>
+                                <span>Target Language (Dubbed Voice)</span>
+                            </label>
+                            <select class="form-select" id="dubTargetLang">
+                                <option value="en">English</option>
+                                <option value="hi">Hindi</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                                <option value="de">German</option>
+                                <option value="zh">Chinese (Mandarin)</option>
+                                <option value="ja">Japanese</option>
+                                <option value="ko">Korean</option>
+                                <option value="ar">Arabic</option>
+                                <option value="ru">Russian</option>
+                                <option value="ta">Tamil</option>
+                                <option value="te">Telugu</option>
+                                <option value="pt">Portuguese</option>
+                                <option value="it">Italian</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="language-select w-100" style="background:rgba(220,38,38,0.07); border-color:rgba(220,38,38,0.3);">
+                            <p class="mb-1" style="color:#aaa; font-size:0.85rem;"><i class="fas fa-magic me-1" style="color:var(--primary);"></i> Source language is auto-detected by Whisper AI</p>
+                            <p class="mb-0" style="color:#666; font-size:0.8rem;">No manual selection needed</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg px-5" id="dubStartBtn" disabled>
+                        <i class="fas fa-microphone-alt me-2"></i> Dub Video
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- PROCESSING CARD -->
+        <div class="upload-container" id="dubProcessingCard" style="display:none;">
+            <div class="text-center">
+                <i class="fas fa-waveform-path upload-icon processing-animation" style="font-size:70px;"></i>
+                <i class="fas fa-cogs upload-icon processing-animation" style="font-size:70px;"></i>
+                <h3 class="mb-4" style="color:#f5f5f5; font-weight:600;">Dubbing In Progress</h3>
+                <div class="row">
+                    <div class="col-lg-8 mx-auto">
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span id="dubCurrentStep" style="color:#f5f5f5;">Initialising...</span>
+                                <span id="dubProgressPct" style="color:#f5f5f5;">0%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width:0%" id="dubProgressBar"></div>
+                            </div>
+                        </div>
+                        <p style="color:#999;">This may take several minutes — TTS is generated per segment.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS CARD -->
+        <div class="upload-container" id="dubResultsCard" style="display:none; margin-top:30px;">
+            <h3 class="mb-4 text-center" style="color:#f5f5f5; font-weight:600;">
+                <i class="fas fa-check-circle me-2" style="color:#22c55e;"></i> Dubbing Complete!
+            </h3>
+            <div class="row">
+                <div class="col-lg-10 mx-auto">
+                    <!-- Detected + info -->
+                    <div class="card bg-dark border-secondary mb-4" style="background-color:#0a0a0a !important;">
+                        <div class="card-header border-secondary text-white fw-bold py-3" style="font-size:1.05rem;">
+                            <i class="fas fa-language me-2" style="color:var(--primary);"></i>
+                            Detected Language: <span id="dubDetectedLang" style="color:var(--accent);">–</span>
+                            &nbsp;&rarr;&nbsp;
+                            Target: <span id="dubTargetLangResult" style="color:var(--accent);">–</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-2" style="color:var(--primary);"><i class="fas fa-file-alt me-2"></i>Original Transcription</h6>
+                            <div class="result-text-box mb-4" id="dubTranscription"></div>
+                            <h6 class="fw-bold mb-2" style="color:var(--primary);"><i class="fas fa-language me-2"></i>Translated Script (Dubbed)</h6>
+                            <div class="result-text-box" id="dubTranslation"></div>
+                        </div>
+                    </div>
+
+                    <!-- Download + reset -->
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="#" id="dubDownloadBtn" class="btn btn-primary btn-lg px-4">
+                            <i class="fas fa-download me-2"></i> Download Dubbed Video
+                        </a>
+                        <button type="button" class="btn btn-outline-light btn-lg px-4" id="dubAnotherBtn" style="border-radius:50px;">
+                            <i class="fas fa-redo me-2"></i> Dub Another
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- end #translate-video -->
+
     <!-- Features Section - Before Upload -->
     <section id="features" class="container py-5">
         <div class="row mb-5">
@@ -888,6 +1149,8 @@ footer .input-group .btn {
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <!-- Font Awesome brand icons (YouTube) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/brands.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('fileInput');
@@ -1161,6 +1424,227 @@ footer .input-group .btn {
                 }
             }
         });
+    </script>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!--  TRANSLATE VIDEO (DUBBING) JAVASCRIPT       -->
+    <!-- ════════════════════════════════════════════ -->
+    <script>
+    // ── Section visibility toggle ──
+    function showTranslateVideoSection() {
+        document.getElementById('translate-video').style.display = 'block';
+        document.getElementById('translate-video').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ── Input toggle (file / YouTube) ──
+    let dubInputMode = 'file';
+    function switchDubInput(mode) {
+        dubInputMode = mode;
+        const fileGroup = document.getElementById('dubFileGroup');
+        const ytGroup   = document.getElementById('dubYtGroup');
+        const fileBtn   = document.getElementById('dubFileTabBtn');
+        const ytBtn     = document.getElementById('dubYtTabBtn');
+        const startBtn  = document.getElementById('dubStartBtn');
+
+        if (mode === 'file') {
+            fileGroup.style.display = 'block';
+            ytGroup.classList.remove('visible');
+            fileBtn.classList.add('active');
+            ytBtn.classList.remove('active');
+            // re-check if a file is already selected
+            const fi = document.getElementById('dubFileInput');
+            startBtn.disabled = !(fi.files && fi.files.length > 0);
+        } else {
+            fileGroup.style.display = 'none';
+            ytGroup.classList.add('visible');
+            ytBtn.classList.add('active');
+            fileBtn.classList.remove('active');
+            const urlVal = document.getElementById('dubYtUrl').value.trim();
+            startBtn.disabled = !urlVal;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // ── Element refs ──
+        const dubFileInput     = document.getElementById('dubFileInput');
+        const dubDropArea      = document.getElementById('dubDropArea');
+        const dubBrowseBtn     = document.getElementById('dubBrowseBtn');
+        const dubFilePreview   = document.getElementById('dubFilePreview');
+        const dubFileNameEl    = document.getElementById('dubFileName');
+        const dubFileSizeEl    = document.getElementById('dubFileSize');
+        const dubRemoveFile    = document.getElementById('dubRemoveFile');
+        const dubStartBtn      = document.getElementById('dubStartBtn');
+        const dubForm          = document.getElementById('dubForm');
+        const dubFormCard      = document.getElementById('dubFormCard');
+        const dubProcessingCard= document.getElementById('dubProcessingCard');
+        const dubResultsCard   = document.getElementById('dubResultsCard');
+        const dubProgressBar   = document.getElementById('dubProgressBar');
+        const dubProgressPct   = document.getElementById('dubProgressPct');
+        const dubCurrentStep   = document.getElementById('dubCurrentStep');
+        const dubYtUrl         = document.getElementById('dubYtUrl');
+        const dubDownloadBtn   = document.getElementById('dubDownloadBtn');
+        const dubAnotherBtn    = document.getElementById('dubAnotherBtn');
+
+        // ── Browse button ──
+        dubBrowseBtn.addEventListener('click', () => dubFileInput.click());
+
+        // ── File selection ──
+        dubFileInput.addEventListener('change', function () {
+            handleDubFile(this.files);
+        });
+
+        // ── Drag & drop ──
+        ['dragenter','dragover','dragleave','drop'].forEach(ev =>
+            dubDropArea.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); })
+        );
+        ['dragenter','dragover'].forEach(ev =>
+            dubDropArea.addEventListener(ev, () => dubDropArea.classList.add('dragover'))
+        );
+        ['dragleave','drop'].forEach(ev =>
+            dubDropArea.addEventListener(ev, () => dubDropArea.classList.remove('dragover'))
+        );
+        dubDropArea.addEventListener('drop', e => handleDubFile(e.dataTransfer.files));
+
+        function handleDubFile(files) {
+            if (!files || files.length === 0) return;
+            const file = files[0];
+            if (!file.type.startsWith('video/')) {
+                alert('Please select a video file.');
+                return;
+            }
+            if (file.size > 500 * 1024 * 1024) {
+                alert('File too large — max 500 MB.');
+                return;
+            }
+            dubFileNameEl.textContent = file.name;
+            dubFileSizeEl.textContent = formatDubSize(file.size);
+            dubFilePreview.style.display = 'block';
+            dubStartBtn.disabled = false;
+        }
+
+        function formatDubSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes','KB','MB','GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // ── Remove file ──
+        dubRemoveFile.addEventListener('click', () => {
+            dubFileInput.value = '';
+            dubFilePreview.style.display = 'none';
+            dubStartBtn.disabled = true;
+        });
+
+        // ── YouTube URL enable button ──
+        dubYtUrl.addEventListener('input', function () {
+            if (dubInputMode === 'youtube') {
+                dubStartBtn.disabled = !this.value.trim();
+            }
+        });
+
+        // ── Form submit ──
+        dubForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            startDubbing();
+        });
+
+        // ── Reset ──
+        dubAnotherBtn.addEventListener('click', () => {
+            dubResultsCard.style.display = 'none';
+            dubFormCard.style.display = 'block';
+            dubFileInput.value = '';
+            dubFilePreview.style.display = 'none';
+            dubStartBtn.disabled = true;
+            dubYtUrl.value = '';
+        });
+
+        // ── Dubbing pipeline ──
+        async function startDubbing() {
+            const dubSteps = [
+                { step: 'Preparing video...',            progress: 8  },
+                { step: 'Downloading / Reading video...',progress: 18 },
+                { step: 'Extracting audio...',            progress: 28 },
+                { step: 'Transcribing speech (Whisper)...',progress: 42 },
+                { step: 'Translating segments (NLLB)...',  progress: 58 },
+                { step: 'Generating neural TTS voice...',  progress: 72 },
+                { step: 'Timing & speed-matching audio...',progress: 84 },
+                { step: 'Muxing audio into video...',      progress: 95 },
+                { step: 'Done!',                           progress: 100 }
+            ];
+            let stepIdx = 0;
+
+            function updateDubProgress(idx) {
+                if (idx < dubSteps.length) {
+                    dubCurrentStep.textContent = dubSteps[idx].step;
+                    dubProgressBar.style.width  = dubSteps[idx].progress + '%';
+                    dubProgressPct.textContent  = dubSteps[idx].progress + '%';
+                }
+            }
+
+            // Show processing card
+            dubFormCard.style.display = 'none';
+            dubResultsCard.style.display = 'none';
+            dubProcessingCard.style.display = 'block';
+            updateDubProgress(0);
+
+            // Simulate step advancement
+            const progressInterval = setInterval(() => {
+                if (stepIdx < dubSteps.length - 2) {
+                    stepIdx++;
+                    updateDubProgress(stepIdx);
+                }
+            }, 4000);
+
+            try {
+                const formData = new FormData();
+                formData.append('targetLanguage', document.getElementById('dubTargetLang').value);
+
+                if (dubInputMode === 'youtube') {
+                    const url = document.getElementById('dubYtUrl').value.trim();
+                    if (!url) throw new Error('Please enter a YouTube URL.');
+                    formData.append('youtubeUrl', url);
+                } else {
+                    if (!dubFileInput.files || dubFileInput.files.length === 0)
+                        throw new Error('Please select a video file.');
+                    formData.append('file', dubFileInput.files[0]);
+                }
+
+                const response = await fetch('/api/translate-audio-video', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                updateDubProgress(dubSteps.length - 1);
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Dubbing failed');
+
+                setTimeout(() => {
+                    dubProcessingCard.style.display = 'none';
+                    dubResultsCard.style.display = 'block';
+
+                    document.getElementById('dubDetectedLang').textContent   = result.detected_language || '?';
+                    document.getElementById('dubTargetLangResult').textContent = document.getElementById('dubTargetLang').options[document.getElementById('dubTargetLang').selectedIndex].text;
+                    document.getElementById('dubTranscription').textContent  = result.transcription || '';
+                    document.getElementById('dubTranslation').textContent    = result.translation   || '';
+
+                    dubDownloadBtn.href     = result.download_url;
+                    dubDownloadBtn.download = result.output_file;
+                    dubDownloadBtn.click();  // auto-trigger download
+                }, 800);
+
+            } catch (err) {
+                clearInterval(progressInterval);
+                console.error('Dubbing error:', err);
+                alert('Error during dubbing: ' + err.message);
+                dubProcessingCard.style.display = 'none';
+                dubFormCard.style.display = 'block';
+            }
+        }
+    });
     </script>
 </body>
 </html>
