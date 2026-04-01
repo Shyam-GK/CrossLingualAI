@@ -5,12 +5,30 @@ REM This script sets up and runs the SecureNews application
 echo 🚀 Starting SecureNews Application...
 echo.
 
-REM Check if Python is installed
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo ❌ Python is not installed. Please install Python 3.8 or higher.
-    pause
-    exit /b 1
+REM Check if py launcher (Windows Python Launcher) is installed
+where py >nul 2>&1
+if %errorlevel% equ 0 (
+    echo 🔍 Checking for Python 3.11 using py launcher...
+    py -3.11 --version >nul 2>&1
+    if %errorlevel% equ 0 (
+        set PYTHON_CMD=py -3.11
+        echo ✅ Python 3.11 detected via 'py -3.11'
+    ) else (
+        echo ⚠️  Python 3.11 not found via py launcher.
+    )
+)
+
+if "%PYTHON_CMD%"=="" (
+    echo 🔍 Checking for default 'python'...
+    python --version >nul 2>&1
+    if %errorlevel% equ 0 (
+        set PYTHON_CMD=python
+        echo ✅ Default 'python' detected.
+    ) else (
+        echo ❌ Python is not installed. Please install Python 3.11 (Recommended).
+        pause
+        exit /b 1
+    )
 )
 
 REM Check if ffmpeg is installed
@@ -24,14 +42,14 @@ if errorlevel 1 (
 )
 
 REM Check if virtual environment exists
-if not exist "venv" (
-    echo 📦 Creating virtual environment...
-    python -m venv venv
+if not exist "venv_311" (
+    echo 📦 Creating virtual environment using %PYTHON_CMD%...
+    %PYTHON_CMD% -m venv venv_311
 )
 
 REM Activate virtual environment
 echo 🔧 Activating virtual environment...
-call venv\Scripts\activate.bat
+call venv_311\Scripts\activate.bat
 
 REM Install/upgrade pip
 echo 📥 Upgrading pip...

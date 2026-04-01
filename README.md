@@ -90,7 +90,8 @@ A sophisticated AI-powered web application that translates video content across 
 
 ### Prerequisites
 
-- **Python** 3.8 or higher
+- **Python 3.11** (Highly Recommended)
+  - *Note: Higher versions like 3.14+ may have compatibility issues with some ML libraries.*
 - **FFmpeg** installed on your system
 - **8GB+ RAM** (16GB recommended for optimal performance)
 - **5GB+ free disk space** for ML models
@@ -100,47 +101,54 @@ A sophisticated AI-powered web application that translates video content across 
 
 #### Option 1: Automated Setup (Recommended)
 
+**Windows:**
+```batch
+run.bat
+```
+
 **macOS / Linux:**
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-**Windows:**
-```batch
-run.bat
-```
-
 #### Option 2: Manual Setup
 
-```bash
-# Clone the repository
-git clone https://github.com/raghulpranxsh/CrossLingualAI.git
-cd CrossLingualAI
+1. **Clone & Enter Directory**
+   ```bash
+   git clone https://github.com/raghulpranxsh/CrossLingualAI.git
+   cd CrossLingualAI
+   ```
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+2. **Create Environment (Python 3.11)**
+   ```bash
+   # Windows
+   py -3.11 -m venv venv_311
+   venv_311\Scripts\activate
 
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
+   # macOS / Linux
+   python3.11 -m venv venv_311
+   source venv_311/bin/activate
+   ```
 
-# Create necessary directories
-mkdir -p uploads outputs
+3. **Install Dependencies**
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
 
-# Run the application
-python app.py
-```
+4. **Run Application**
+   ```bash
+   python app.py
+   ```
 
 ### First Run
 
 On the first run, the application will automatically download required ML models:
-
 - **Whisper Base Model** (~150MB)
 - **NLLB-200 Translation Model** (~1.2GB)
 
-**Note:** This initial download may take 10-15 minutes depending on your internet speed. Models are cached locally for subsequent runs.
+**Note:** Initial download may take 10-15 minutes. Models are cached locally in `~/.cache/huggingface/` for subsequent runs.
 
 ---
 

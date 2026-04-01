@@ -24,24 +24,18 @@ The script will:
 
 ### Step 1: Install Prerequisites
 
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Linux:**
-```bash
-sudo apt-get update
-sudo apt-get install ffmpeg
-```
-
-**Windows:**
-Download FFmpeg from https://ffmpeg.org/download.html and add to PATH
+- **Python 3.11** (Highly Recommended)
+- **FFmpeg** installed (brew install ffmpeg / sudo apt install ffmpeg)
 
 ### Step 2: Create Virtual Environment
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Windows
+py -3.11 -m venv venv_311
+venv_311\Scripts\activate
+
+# macOS / Linux
+python3.11 -m venv venv_311
+source venv_311/bin/activate
 ```
 
 ### Step 3: Install Dependencies
@@ -50,12 +44,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Step 4: Create Directories
-```bash
-mkdir -p uploads outputs
-```
-
-### Step 5: Run the Application
+### Step 4: Run the Application
 ```bash
 python app.py
 ```
