@@ -1,4 +1,11 @@
 import os
+import sys
+
+# Check for Python version compatibility
+if sys.version_info.major == 3 and sys.version_info.minor > 12:
+    print(f"⚠️  WARNING: You are running Python {sys.version_info.major}.{sys.version_info.minor}. "
+          "Some AI/ML libraries (like bitsandbytes) may have stability issues on versions higher than 3.12. "
+          "If you encounter errors, please use Python 3.11.")
 import tempfile
 import subprocess
 import whisper
@@ -103,9 +110,66 @@ def extract_audio_from_video(video_path):
     return output_audio_path
 
 def transcribe_audio(audio_path):
-    """Transcribe audio using Whisper"""
-    result = whisper_model.transcribe(audio_path)
-    return result["text"], result["language"], result.get("segments", [])
+    """Transcribe audio using Whisper with quality filtering and logging."""
+    import re, time
+    # Validate file exists and is non-empty
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+    if os.path.getsize(audio_path) < 1024:
+        raise ValueError("Audio file is too small — may be empty or corrupt.")
+
+    # Run Whisper with beam search for better accuracy
+    print("[Whisper] Transcribing...")
+    start_time = time.time()
+    result = whisper_model.transcribe(
+        audio_path,
+        beam_size=5,                      # better accuracy than default greedy
+        condition_on_previous_text=True,   # uses prev text to predict next
+        verbose=False
+    )
+    elapsed = time.time() - start_time
+
+    detected_lang = result.get("language", "unknown")
+    raw_segments  = result.get("segments", [])
+    full_text     = result.get("text", "").strip()
+    print(f"[Whisper] Language: {detected_lang} | Time: {elapsed:.1f}s | Segments: {len(raw_segments)}")
+
+
+    cleaned_segments = []
+    for seg in raw_segments:
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        # no_speech_prob > 0.6 = likely silence/noise
+        if seg.get("no_speech_prob", 0) > 0.6:
+            continue
+        # avg_logprob < -1.0 = model is very uncertain
+        if seg.get("avg_logprob", 0) < -1.0:
+            continue
+        # compression_ratio > 2.4 = likely hallucinated/repeated text
+        if seg.get("compression_ratio", 1.0) > 2.4:
+            continue
+
+        # Clean the text(multiple spaces → single space,unwanted punctuation at start)
+        text = re.sub(r'\s+', ' ', text).strip()
+        text = text.lstrip('.,;:!? ')
+
+        cleaned_segments.append({
+            "start": seg["start"],
+            "end":   seg["end"],
+            "text":  text
+        })
+
+    # Rebuild transcript from cleaned segments, fall back to raw if all filtered
+    clean_text = " ".join(s["text"] for s in cleaned_segments).strip() or full_text
+
+    if not clean_text:
+        raise ValueError("Whisper returned an empty transcript. Audio may be silent or unsupported.")
+
+    skipped = len(raw_segments) - len(cleaned_segments)
+    print(f"[Whisper] ✓ {len(cleaned_segments)} segments kept, {skipped} filtered | {len(clean_text.split())} words")
+
+    return clean_text, detected_lang, cleaned_segments
 
 def translate_text(text, source_lang_code, target_lang_code="en"):
     """Translate text using NLLB model"""
@@ -229,17 +293,43 @@ def download_youtube_video(url):
         'merge_output_format': 'mp4',
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {'youtube': {'player_client': ['ios', 'web']}}
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        video_id = info.get('id', 'video')
-        file_path = os.path.join(UPLOAD_FOLDER, f"{video_id}.mp4")
-        # yt-dlp may produce a differently-named file; find it
-        if not os.path.exists(file_path):
-            for fname in os.listdir(UPLOAD_FOLDER):
-                if video_id in fname:
-                    file_path = os.path.join(UPLOAD_FOLDER, fname)
-                    break
+    
+    if os.path.exists('cookies.txt'):
+        ydl_opts['cookiefile'] = 'cookies.txt'
+    
+    info = None
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+    except Exception as e:
+        print(f"Initial YouTube download failed: {e}")
+        print("Attempting to bypass bot detection using browser cookies...")
+        success = False
+        for browser in [('chrome',), ('edge',), ('firefox',), ('opera',), ('brave',)]:
+            try:
+                print(f"Trying cookies from {browser[0]}...")
+                ydl_opts['cookiesfrombrowser'] = browser
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                success = True
+                print(f"Successfully extracted using {browser[0]} cookies!")
+                break
+            except Exception as ex:
+                print(f"Failed with {browser[0]}: {ex}")
+        
+        if not success:
+            raise Exception(f"YouTube blocked the download due to bot detection. Please install a 'Get cookies.txt LOCALLY' extension in your browser, export your YouTube cookies, save the file as 'cookies.txt' in your project folder, and try again. Detailed Error: {e}")
+
+    video_id = info.get('id', 'video')
+    file_path = os.path.join(UPLOAD_FOLDER, f"{video_id}.mp4")
+    # yt-dlp may produce a differently-named file; find it
+    if not os.path.exists(file_path):
+        for fname in os.listdir(UPLOAD_FOLDER):
+            if video_id in fname:
+                file_path = os.path.join(UPLOAD_FOLDER, fname)
+                break
     return file_path
 
 async def _generate_tts_async(text, voice, output_path):

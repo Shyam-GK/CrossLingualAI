@@ -5,9 +5,19 @@ __pycache__/
 *.so
 .Python
 venv/
+venv*/
 env/
 ENV/
 .venv
+
+# Anthropic/MCP
+.claude/
+.mcp.json
+
+install_log.txt
+startup_error.txt
+cookies.txt
+yt_debug.txt
 
 # Flask
 instance/

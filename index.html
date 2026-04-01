@@ -6,6 +6,7 @@
     <title>VideoTranslate AI - Multilingual Video Translation Platform</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
     <style>
         :root {
     --primary: #dc2626;
@@ -694,6 +695,18 @@ footer .input-group .btn {
 .result-text-box::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 3px; }
 .result-text-box::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
 
+/* Chat markdown rendering styles */
+.chat-md p { margin: 0 0 8px 0; }
+.chat-md p:last-child { margin-bottom: 0; }
+.chat-md strong { color: #f5f5f5; }
+.chat-md ul, .chat-md ol { margin: 6px 0; padding-left: 20px; }
+.chat-md li { margin-bottom: 4px; }
+.chat-md code { background: #1a1a1a; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+.chat-md pre { background: #1a1a1a; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+.chat-md pre code { background: none; padding: 0; }
+.chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4 { color: #f5f5f5; margin: 10px 0 6px; font-size: 1em; font-weight: 700; }
+.chat-md blockquote { border-left: 3px solid var(--primary); padding-left: 12px; margin: 8px 0; color: #bbb; }
+
 .step-badge {
     display: inline-flex;
     align-items: center;
@@ -909,7 +922,7 @@ footer .input-group .btn {
     <!-- ══════════════════════════════════════════ -->
     <!-- TRANSLATE VIDEO (AUDIO DUBBING) SECTION  -->
     <!-- ══════════════════════════════════════════ -->
-    <section id="translate-video" class="container" style="display:none; margin-bottom:50px;">
+    <section id="translate-video" class="container" style="margin-bottom:50px;">
         <!-- FORM CARD -->
         <div class="upload-container" id="dubFormCard">
             <h2 class="mb-1">Translate Video <span style="color:var(--primary)">Audio</span></h2>
@@ -1209,7 +1222,8 @@ footer .input-group .btn {
                         throw new Error(result.error || 'Chat failed');
                     }
                     
-                    chatHistory.innerHTML += `<div class="mb-3"><strong>AI:</strong> <div style="background-color: #333; padding: 10px 15px; border-radius: 15px; display: inline-block; margin-top: 5px;">${result.answer.replace(/\\n/g, '<br>')}</div></div>`;
+                    const renderedAnswer = typeof marked !== 'undefined' ? marked.parse(result.answer) : result.answer.replace(/\n/g, '<br>');
+                    chatHistory.innerHTML += `<div class="mb-3"><strong>AI:</strong> <div class="chat-md" style="background-color: #333; padding: 10px 15px; border-radius: 15px; display: inline-block; margin-top: 5px;">${renderedAnswer}</div></div>`;
                     chatHistory.scrollTop = chatHistory.scrollHeight;
                     
                 } catch (error) {

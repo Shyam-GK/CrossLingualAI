@@ -6,9 +6,15 @@
 echo "🚀 Starting SecureNews Application..."
 echo ""
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is not installed. Please install Python 3.8 or higher."
+# Check for Python 3.11 preferred
+if command -v python3.11 &> /dev/null; then
+    PYTHON_CMD="python3.11"
+    echo "✅ Python 3.11 detected."
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+    echo "✅ Python 3 detected (Python 3.11 recommended)."
+else
+    echo "❌ Python is not installed. Please install Python 3.11 (Recommended)."
     exit 1
 fi
 
@@ -34,14 +40,14 @@ if ! command -v ffmpeg &> /dev/null; then
 fi
 
 # Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
+if [ ! -d "venv_311" ]; then
+    echo "📦 Creating virtual environment using $PYTHON_CMD..."
+    $PYTHON_CMD -m venv venv_311
 fi
 
 # Activate virtual environment
 echo "🔧 Activating virtual environment..."
-source venv/bin/activate
+source venv_311/bin/activate
 
 # Install/upgrade pip
 echo "📥 Upgrading pip..."
@@ -65,5 +71,5 @@ echo "   This may take 10-15 minutes depending on your internet connection."
 echo ""
 
 # Run the application
-python3 app.py
+python app.py
 
