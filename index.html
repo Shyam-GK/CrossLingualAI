@@ -24,6 +24,13 @@
     --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+html { scroll-behavior: smooth; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #1a1a1a 0%, #000000 50%, #1a0000 100%);
@@ -164,8 +171,10 @@ body {
 
 /* Upload Container Styling */
 .upload-container {
-    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
-    border: 2px solid var(--primary);
+    background: rgba(26, 26, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 4px solid var(--primary);
     border-radius: 25px;
     box-shadow: var(--shadow-md);
     padding: 50px;
@@ -305,8 +314,9 @@ body {
 
 /* Feature cards enhancement */
 .feature-card {
-    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
-    border: 2px solid #333;
+    background: rgba(26, 26, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     padding: 40px 30px;
     margin-bottom: 30px;
@@ -375,8 +385,9 @@ body {
 
 /* Recent translations cards */
 .recent-translation {
-    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
-    border: 2px solid #333;
+    background: rgba(26, 26, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     overflow: hidden;
     box-shadow: var(--shadow-sm);
@@ -720,6 +731,23 @@ footer .input-group .btn {
     margin-bottom: 16px;
 }
 
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-15px); }
+    60% { transform: translateY(-7px); }
+}
+
+.scroll-indicator {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 2.5rem;
+    animation: bounce 2s infinite;
+    display: inline-block;
+    transition: var(--transition);
+    text-decoration: none;
+}
+.scroll-indicator:hover {
+    color: var(--accent);
+}
     </style>
 </head>
 <body>
@@ -736,11 +764,11 @@ footer .input-group .btn {
                         <a class="nav-link" href="#features">Features</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#converter">Converter</a>
+                        <a class="nav-link" href="#subtitles">Subtitles & Summary</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" id="translateVideoNavBtn" href="#translate-video" onclick="showTranslateVideoSection()" style="color: var(--accent); font-weight:700;">
-                            <i class="fas fa-volume-up me-1"></i> Translate Video
+                            <i class="fas fa-microphone-alt me-1"></i> AI Voice Dubbing
                         </a>
                     </li>
                     <li class="nav-item">
@@ -757,23 +785,27 @@ footer .input-group .btn {
             <div class="row align-items-center min-vh-75">
                 <div class="col-lg-7 text-start">
                     <h1 class="display-3 fw-bold mb-4" style="line-height: 1.2;">Multilingual Video Translation Platform</h1>
-                    <p class="lead mb-4" style="font-size: 1.25rem; color: #e0e0e0;">Transform any video content across languages using advanced AI technology. Get accurate, context-aware translations with embedded subtitles.</p>
-                    <div class="d-flex gap-3">
-                        <a href="#converter" class="btn btn-primary btn-lg px-4 py-3">Get Started</a>
-                        <a href="#features" class="btn btn-outline-light btn-lg px-4 py-3">Learn More</a>
+                    <p class="lead mb-4" style="font-size: 1.25rem; color: #e0e0e0;">Break language barriers instantly. Generate localized subtitles, extract summaries, or completely dub videos with natural-sounding AI voices.</p>
+                    <div class="d-flex gap-3 mt-4">
+                        <a href="#subtitles" class="btn btn-primary btn-lg px-4 py-3">Start Formatting</a>
+                        <a href="#translate-video" class="btn btn-outline-light btn-lg px-4 py-3">Try Voice Dubbing</a>
                     </div>
                 </div>
                 <div class="col-lg-5 text-center mt-5 mt-lg-0">
-                    <i class="fas fa-video" style="font-size: 200px; color: rgba(220, 38, 38, 0.3);"></i>
+                    <i class="fas fa-satellite-dish" style="font-size: 200px; color: rgba(220, 38, 38, 0.15);"></i>
                 </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="#subtitles" class="scroll-indicator"><i class="fas fa-chevron-down"></i></a>
             </div>
         </div>
     </section>
 
-    <!-- Upload Section -->
-    <section id="upload" class="container">
+    <!-- Subtitles and Summary Section -->
+    <section id="subtitles" class="container">
         <div class="upload-container">
-            <h2 class="text-center mb-4">Upload Your News Video</h2>
+            <h2 class="text-center mb-4">Generate Subtitles & Summaries</h2>
             <div class="row">
                 <div class="col-lg-8 mx-auto">
                     <form id="uploadForm">
@@ -920,13 +952,13 @@ footer .input-group .btn {
     </section>
 
     <!-- ══════════════════════════════════════════ -->
-    <!-- TRANSLATE VIDEO (AUDIO DUBBING) SECTION  -->
+    <!-- AI VOICE DUBBING SECTION                 -->
     <!-- ══════════════════════════════════════════ -->
     <section id="translate-video" class="container" style="margin-bottom:50px;">
         <!-- FORM CARD -->
         <div class="upload-container" id="dubFormCard">
-            <h2 class="mb-1">Translate Video <span style="color:var(--primary)">Audio</span></h2>
-            <p style="color:#999; margin-bottom:30px;">Auto-detects the source language — replaces spoken audio with AI-generated voice in your chosen language.</p>
+            <h2 class="mb-1">AI Voice <span style="color:var(--primary)">Dubbing</span></h2>
+            <p style="color:#999; margin-bottom:30px;">Automatically detect the original speech and replace it with a natural-sounding translated AI voice.</p>
 
             <!-- Input method toggle -->
             <div class="input-toggle">
@@ -1141,7 +1173,8 @@ footer .input-group .btn {
                     <h5 class="mb-3" style="font-weight: 600;">Quick Links</h5>
                     <ul class="list-unstyled">
                         <li class="mb-2"><a href="#features" style="color: #999; text-decoration: none; transition: color 0.3s;">Features</a></li>
-                        <li class="mb-2"><a href="#converter" style="color: #999; text-decoration: none; transition: color 0.3s;">Converter</a></li>
+                        <li class="mb-2"><a href="#subtitles" style="color: #999; text-decoration: none; transition: color 0.3s;">Subtitles & Summary</a></li>
+                        <li class="mb-2"><a href="#translate-video" style="color: #999; text-decoration: none; transition: color 0.3s;">Voice Dubbing</a></li>
                         <li class="mb-2"><a href="#about" style="color: #999; text-decoration: none; transition: color 0.3s;">About</a></li>
                     </ul>
                 </div>
